@@ -6,6 +6,8 @@ import Login from '@/pages/Login'
 import CreateMarket from '@/pages/CreateMarket'
 import MarketDetail from '@/pages/MarketDetail'
 import GetStarted from '@/pages/GetStarted'
+import Leaderboard from '@/pages/Leaderboard'
+import Profile from '@/pages/Profile'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -37,6 +39,15 @@ function AppRoutes() {
           }
         />
         <Route path="/market/:id" element={<MarketDetail />} />
+        <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </Layout>
   )
