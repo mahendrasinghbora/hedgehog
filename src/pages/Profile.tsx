@@ -4,7 +4,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   onSnapshot,
   doc,
   getDoc,
@@ -33,57 +32,74 @@ export default function Profile() {
   useEffect(() => {
     if (!user) return
 
-    // Fetch user's bets
+    // Fetch user's bets (no orderBy to avoid index requirement)
     const betsQuery = query(
       collection(db, 'bets'),
-      where('userId', '==', user.id),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', user.id)
     )
 
-    const unsubscribeBets = onSnapshot(betsQuery, async (snapshot) => {
-      const betData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Bet[]
+    const unsubscribeBets = onSnapshot(
+      betsQuery,
+      async (snapshot) => {
+        const betData = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as Bet[]
 
-      // Fetch market details for each bet
-      const betsWithMarkets = await Promise.all(
-        betData.map(async (bet) => {
-          const marketDoc = await getDoc(doc(db, 'markets', bet.marketId))
-          if (marketDoc.exists()) {
-            return {
-              ...bet,
-              market: { id: marketDoc.id, ...marketDoc.data() } as Market,
+        // Fetch market details for each bet
+        const betsWithMarkets = await Promise.all(
+          betData.map(async (bet) => {
+            try {
+              const marketDoc = await getDoc(doc(db, 'markets', bet.marketId))
+              if (marketDoc.exists()) {
+                return {
+                  ...bet,
+                  market: { id: marketDoc.id, ...marketDoc.data() } as Market,
+                }
+              }
+            } catch (e) {
+              console.error('Error fetching market:', e)
+            }
+            return bet
+          })
+        )
+
+        // Sort by createdAt descending (client-side)
+        betsWithMarkets.sort((a, b) => {
+          const aTime = a.createdAt?.seconds || 0
+          const bTime = b.createdAt?.seconds || 0
+          return bTime - aTime
+        })
+
+        setBets(betsWithMarkets)
+
+        // Calculate stats
+        let wins = 0
+        let losses = 0
+        betsWithMarkets.forEach((bet) => {
+          if (bet.market?.status === 'resolved') {
+            if (bet.market.resolvedOutcomeId === bet.outcomeId) {
+              wins++
+            } else {
+              losses++
             }
           }
-          return bet
         })
-      )
 
-      setBets(betsWithMarkets)
+        setStats((prev) => ({
+          ...prev,
+          totalBets: betData.length,
+          wins,
+          losses,
+        }))
 
-      // Calculate stats
-      let wins = 0
-      let losses = 0
-      betsWithMarkets.forEach((bet) => {
-        if (bet.market?.status === 'resolved') {
-          if (bet.market.resolvedOutcomeId === bet.outcomeId) {
-            wins++
-          } else {
-            losses++
-          }
-        }
-      })
-
-      setStats((prev) => ({
-        ...prev,
-        totalBets: betData.length,
-        wins,
-        losses,
-      }))
-
-      setLoading(false)
-    })
+        setLoading(false)
+      },
+      (error) => {
+        console.error('Error fetching bets:', error)
+        setLoading(false)
+      }
+    )
 
     // Fetch markets created by user
     const marketsQuery = query(
