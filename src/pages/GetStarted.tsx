@@ -47,8 +47,8 @@ export default function GetStarted() {
           <div className="space-y-2">
             <h3 className="font-semibold">4. Wait for Resolution</h3>
             <p className="text-sm text-muted-foreground">
-              Once the event happens, the market creator <strong>resolves</strong>
-              the market by selecting the winning outcome.
+              Once the event happens, the market creator <strong>resolves</strong> the
+              market by selecting the winning outcome.
             </p>
           </div>
 
