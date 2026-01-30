@@ -34,7 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (fbUser) {
         const userDoc = await getDoc(doc(db, 'users', fbUser.uid))
         if (userDoc.exists()) {
-          setUser(userDoc.data() as User)
+          const data = userDoc.data()
+          setUser({
+            ...data,
+            id: fbUser.uid,
+            coins: typeof data.coins === 'number' ? data.coins : STARTING_COINS,
+          } as User)
         } else {
           // Create new user with starting coins
           const newUser: User = {
