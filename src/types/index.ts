@@ -3,6 +3,7 @@ export interface User {
   displayName: string
   email: string
   coins: number
+  avatarId?: string
   createdAt: Date
 }
 

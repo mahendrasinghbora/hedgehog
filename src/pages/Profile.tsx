@@ -13,13 +13,15 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Bet, Market } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import Avatar, { ANIMAL_AVATARS } from '@/components/Avatar'
 
 interface BetWithMarket extends Bet {
   market?: Market
 }
 
 export default function Profile() {
-  const { user } = useAuth()
+  const { user, updateAvatar } = useAuth()
   const [bets, setBets] = useState<BetWithMarket[]>([])
   const [stats, setStats] = useState({
     totalBets: 0,
@@ -28,6 +30,7 @@ export default function Profile() {
     losses: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -66,8 +69,8 @@ export default function Profile() {
 
         // Sort by createdAt descending (client-side)
         betsWithMarkets.sort((a, b) => {
-          const aTime = a.createdAt?.seconds || 0
-          const bTime = b.createdAt?.seconds || 0
+          const aTime = (a.createdAt as unknown as { seconds: number })?.seconds || 0
+          const bTime = (b.createdAt as unknown as { seconds: number })?.seconds || 0
           return bTime - aTime
         })
 
@@ -120,6 +123,11 @@ export default function Profile() {
     }
   }, [user])
 
+  const handleSelectAvatar = async (avatarId: string | null) => {
+    await updateAvatar(avatarId)
+    setShowAvatarPicker(false)
+  }
+
   if (!user) {
     return (
       <div className="text-center py-8">
@@ -141,13 +149,66 @@ export default function Profile() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">{user.displayName}</CardTitle>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+              className="relative group"
+            >
+              <Avatar seed={user.id} avatarId={user.avatarId} size={64} />
+              <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="text-white text-xs">Edit</span>
+              </div>
+            </button>
+            <div>
+              <CardTitle className="text-xl">{user.displayName}</CardTitle>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">{user.email}</p>
-          <p className="text-2xl font-bold mt-2">{user.coins} coins</p>
+          <p className="text-2xl font-bold">{user.coins} coins</p>
         </CardContent>
       </Card>
+
+      {showAvatarPicker && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Choose Avatar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-4 gap-3">
+              <button
+                onClick={() => handleSelectAvatar(null)}
+                className={`p-2 rounded-lg border-2 transition-colors ${
+                  !user.avatarId ? 'border-primary bg-primary/10' : 'border-transparent hover:border-muted'
+                }`}
+              >
+                <Avatar seed={user.id} avatarId={null} size={48} className="mx-auto" />
+                <p className="text-xs text-center mt-1">Default</p>
+              </button>
+              {ANIMAL_AVATARS.map((animal) => (
+                <button
+                  key={animal.id}
+                  onClick={() => handleSelectAvatar(animal.id)}
+                  className={`p-2 rounded-lg border-2 transition-colors ${
+                    user.avatarId === animal.id ? 'border-primary bg-primary/10' : 'border-transparent hover:border-muted'
+                  }`}
+                >
+                  <Avatar seed={user.id} avatarId={animal.id} size={48} className="mx-auto" />
+                  <p className="text-xs text-center mt-1">{animal.name}</p>
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="outline"
+              className="w-full mt-4"
+              onClick={() => setShowAvatarPicker(false)}
+            >
+              Close
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Card>
