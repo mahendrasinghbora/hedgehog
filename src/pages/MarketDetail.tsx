@@ -10,6 +10,7 @@ import {
   onSnapshot,
   addDoc,
   increment,
+  Timestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Market, Bet } from '@/types'
@@ -32,17 +33,19 @@ export default function MarketDetail() {
   useEffect(() => {
     if (!id) return
 
-    const fetchMarket = async () => {
-      const marketDoc = await getDoc(doc(db, 'markets', id))
-      if (marketDoc.exists()) {
-        setMarket({ id: marketDoc.id, ...marketDoc.data() } as Market)
+    const unsubscribe = onSnapshot(doc(db, 'markets', id), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data()
+        setMarket({
+          id: docSnap.id,
+          ...data,
+          deadline: data.deadline instanceof Timestamp ? data.deadline.toDate() : new Date(data.deadline),
+        } as Market)
       }
-    }
-
-    fetchMarket()
+    })
 
     const q = query(collection(db, 'bets'), where('marketId', '==', id))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeBets = onSnapshot(q, (snapshot) => {
       const betData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -50,11 +53,17 @@ export default function MarketDetail() {
       setBets(betData)
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      unsubscribeBets()
+    }
   }, [id])
 
+  const isDeadlinePassed = market ? new Date() > new Date(market.deadline) : false
+  const canBet = market?.status === 'open' && !isDeadlinePassed
+
   const placeBet = async () => {
-    if (!user || !market || !selectedOutcome || !betAmount) return
+    if (!user || !market || !selectedOutcome || !betAmount || !canBet) return
     const amount = parseInt(betAmount)
     if (amount <= 0 || amount > user.coins) return
 
@@ -92,6 +101,21 @@ export default function MarketDetail() {
     }
   }
 
+  const closeBetting = async () => {
+    if (!market || market.creatorId !== user?.id) return
+
+    setLoading(true)
+    try {
+      await updateDoc(doc(db, 'markets', market.id), {
+        status: 'closed',
+      })
+    } catch (error) {
+      console.error('Failed to close betting:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const resolveMarket = async (outcomeId: string) => {
     if (!market || market.creatorId !== user?.id) return
 
@@ -104,16 +128,16 @@ export default function MarketDetail() {
 
       // Distribute winnings
       const winningBets = bets.filter((b) => b.outcomeId === outcomeId)
-      const losingPool = market.totalPool - market.outcomes.find((o) => o.id === outcomeId)!.totalBets
+      const winningOutcome = market.outcomes.find((o) => o.id === outcomeId)!
+      const losingPool = market.totalPool - winningOutcome.totalBets
 
       for (const bet of winningBets) {
-        const winningOutcome = market.outcomes.find((o) => o.id === outcomeId)!
         const shareOfPool = bet.amount / winningOutcome.totalBets
         const winnings = Math.floor(bet.amount + losingPool * shareOfPool)
 
         const userDoc = await getDoc(doc(db, 'users', bet.userId))
         if (userDoc.exists()) {
-          const currentCoins = userDoc.data().coins
+          const currentCoins = userDoc.data().coins || 0
           await updateDoc(doc(db, 'users', bet.userId), {
             coins: currentCoins + winnings,
           })
@@ -135,6 +159,10 @@ export default function MarketDetail() {
   const isCreator = user?.id === market.creatorId
   const userBets = bets.filter((b) => b.userId === user?.id)
 
+  const formatDeadline = (date: Date) => {
+    return new Date(date).toLocaleString()
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -143,14 +171,14 @@ export default function MarketDetail() {
             <CardTitle className="text-xl">{market.title}</CardTitle>
             <Badge
               className={
-                market.status === 'open'
+                market.status === 'open' && !isDeadlinePassed
                   ? 'bg-green-500'
-                  : market.status === 'closed'
+                  : market.status === 'closed' || isDeadlinePassed
                   ? 'bg-yellow-500'
                   : 'bg-gray-500'
               }
             >
-              {market.status}
+              {market.status === 'open' && isDeadlinePassed ? 'closed' : market.status}
             </Badge>
           </div>
         </CardHeader>
@@ -160,6 +188,10 @@ export default function MarketDetail() {
           )}
           <div className="text-sm text-muted-foreground">
             Created by {market.creatorName}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Deadline: {formatDeadline(market.deadline)}
+            {isDeadlinePassed && <span className="text-yellow-600 ml-2">(passed)</span>}
           </div>
           <div className="font-medium">{market.totalPool} coins in pool</div>
         </CardContent>
@@ -179,18 +211,20 @@ export default function MarketDetail() {
             return (
               <div
                 key={outcome.id}
-                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                className={`p-4 rounded-lg border transition-colors ${
+                  canBet ? 'cursor-pointer' : ''
+                } ${
                   selectedOutcome === outcome.id
                     ? 'border-primary bg-primary/5'
-                    : 'hover:bg-accent'
+                    : canBet
+                    ? 'hover:bg-accent'
+                    : ''
                 } ${
                   market.resolvedOutcomeId === outcome.id
                     ? 'border-green-500 bg-green-500/10'
                     : ''
                 }`}
-                onClick={() =>
-                  market.status === 'open' && setSelectedOutcome(outcome.id)
-                }
+                onClick={() => canBet && setSelectedOutcome(outcome.id)}
               >
                 <div className="flex justify-between items-center">
                   <span className="font-medium">{outcome.label}</span>
@@ -210,7 +244,7 @@ export default function MarketDetail() {
         </CardContent>
       </Card>
 
-      {market.status === 'open' && user && (
+      {canBet && user && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Place a Bet</CardTitle>
@@ -250,6 +284,14 @@ export default function MarketDetail() {
         </Card>
       )}
 
+      {!canBet && market.status !== 'resolved' && (
+        <Card>
+          <CardContent className="py-6 text-center text-muted-foreground">
+            Betting is closed for this market.
+          </CardContent>
+        </Card>
+      )}
+
       {userBets.length > 0 && (
         <Card>
           <CardHeader>
@@ -273,7 +315,23 @@ export default function MarketDetail() {
         </Card>
       )}
 
-      {isCreator && market.status === 'open' && (
+      {isCreator && market.status === 'open' && !isDeadlinePassed && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Close Betting Early</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Stop accepting new bets before the deadline.
+            </p>
+            <Button variant="outline" onClick={closeBetting} disabled={loading}>
+              Close Betting
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {isCreator && (market.status === 'closed' || isDeadlinePassed) && market.status !== 'resolved' && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Resolve Market</CardTitle>
