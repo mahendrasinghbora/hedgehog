@@ -23,6 +23,12 @@ export default function Layout({ children }: LayoutProps) {
             HedgeHog
           </Link>
           <div className="flex items-center gap-4">
+            <Link
+              to="/get-started"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Help
+            </Link>
             {user ? (
               <>
                 <span className="text-sm font-medium">

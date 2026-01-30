@@ -5,6 +5,7 @@ import Home from '@/pages/Home'
 import Login from '@/pages/Login'
 import CreateMarket from '@/pages/CreateMarket'
 import MarketDetail from '@/pages/MarketDetail'
+import GetStarted from '@/pages/GetStarted'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -26,6 +27,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/get-started" element={<GetStarted />} />
         <Route
           path="/create"
           element={

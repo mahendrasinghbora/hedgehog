@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,10 +25,18 @@ export default function Login() {
             Prediction markets for friends. Bet virtual coins on outcomes!
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <Button onClick={handleSignIn} className="w-full" size="lg">
             Sign in with Google
           </Button>
+          <div className="text-center">
+            <Link
+              to="/get-started"
+              className="text-sm text-muted-foreground hover:text-foreground underline"
+            >
+              New here? Learn how to play
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>
