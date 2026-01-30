@@ -14,7 +14,7 @@ import { Bet, Market } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import Avatar, { ANIMAL_AVATARS } from '@/components/Avatar'
+import Avatar, { AVATAR_STYLES } from '@/components/Avatar'
 
 interface BetWithMarket extends Bet {
   market?: Market
@@ -154,7 +154,7 @@ export default function Profile() {
               onClick={() => setShowAvatarPicker(!showAvatarPicker)}
               className="relative group"
             >
-              <Avatar seed={user.id} avatarId={user.avatarId} size={64} />
+              <Avatar seed={user.id} styleId={user.avatarId} size={64} />
               <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white text-xs">Edit</span>
               </div>
@@ -173,29 +173,22 @@ export default function Profile() {
       {showAvatarPicker && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Choose Avatar</CardTitle>
+            <CardTitle className="text-lg">Choose Avatar Style</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-4 gap-3">
-              <button
-                onClick={() => handleSelectAvatar(null)}
-                className={`p-2 rounded-lg border-2 transition-colors ${
-                  !user.avatarId ? 'border-primary bg-primary/10' : 'border-transparent hover:border-muted'
-                }`}
-              >
-                <Avatar seed={user.id} avatarId={null} size={48} className="mx-auto" />
-                <p className="text-xs text-center mt-1">Default</p>
-              </button>
-              {ANIMAL_AVATARS.map((animal) => (
+            <div className="grid grid-cols-3 gap-3">
+              {AVATAR_STYLES.map((style) => (
                 <button
-                  key={animal.id}
-                  onClick={() => handleSelectAvatar(animal.id)}
+                  key={style.id}
+                  onClick={() => handleSelectAvatar(style.id)}
                   className={`p-2 rounded-lg border-2 transition-colors ${
-                    user.avatarId === animal.id ? 'border-primary bg-primary/10' : 'border-transparent hover:border-muted'
+                    user.avatarId === style.id || (!user.avatarId && style.id === 'pixelArt')
+                      ? 'border-primary bg-primary/10'
+                      : 'border-transparent hover:border-muted'
                   }`}
                 >
-                  <Avatar seed={user.id} avatarId={animal.id} size={48} className="mx-auto" />
-                  <p className="text-xs text-center mt-1">{animal.name}</p>
+                  <Avatar seed={user.id} styleId={style.id} size={56} className="mx-auto" />
+                  <p className="text-xs text-center mt-1">{style.name}</p>
                 </button>
               ))}
             </div>

@@ -1,58 +1,47 @@
 import { useMemo } from 'react'
 import { createAvatar } from '@dicebear/core'
-import { pixelArt } from '@dicebear/collection'
+import * as styles from '@dicebear/collection'
 
-// Pixel animal avatars (emoji-based for simplicity)
-export const ANIMAL_AVATARS = [
-  { id: 'hedgehog', emoji: '🦔', name: 'Hedgehog' },
-  { id: 'fox', emoji: '🦊', name: 'Fox' },
-  { id: 'cat', emoji: '🐱', name: 'Cat' },
-  { id: 'dog', emoji: '🐶', name: 'Dog' },
-  { id: 'owl', emoji: '🦉', name: 'Owl' },
-  { id: 'bear', emoji: '🐻', name: 'Bear' },
-  { id: 'rabbit', emoji: '🐰', name: 'Rabbit' },
-  { id: 'panda', emoji: '🐼', name: 'Panda' },
-  { id: 'koala', emoji: '🐨', name: 'Koala' },
-  { id: 'tiger', emoji: '🐯', name: 'Tiger' },
-  { id: 'lion', emoji: '🦁', name: 'Lion' },
-  { id: 'wolf', emoji: '🐺', name: 'Wolf' },
-]
+// Available DiceBear styles for users to choose from
+export const AVATAR_STYLES = [
+  { id: 'pixelArt', name: 'Pixel Art', style: styles.pixelArt },
+  { id: 'adventurer', name: 'Adventurer', style: styles.adventurer },
+  { id: 'avataaars', name: 'Avataaars', style: styles.avataaars },
+  { id: 'bottts', name: 'Robots', style: styles.bottts },
+  { id: 'funEmoji', name: 'Fun Emoji', style: styles.funEmoji },
+  { id: 'lorelei', name: 'Lorelei', style: styles.lorelei },
+  { id: 'micah', name: 'Micah', style: styles.micah },
+  { id: 'miniavs', name: 'Mini', style: styles.miniavs },
+  { id: 'openPeeps', name: 'Open Peeps', style: styles.openPeeps },
+  { id: 'personas', name: 'Personas', style: styles.personas },
+  { id: 'thumbs', name: 'Thumbs', style: styles.thumbs },
+  { id: 'bigSmile', name: 'Big Smile', style: styles.bigSmile },
+] as const
+
+type StyleId = typeof AVATAR_STYLES[number]['id']
 
 interface AvatarProps {
   seed: string
-  avatarId?: string | null
+  styleId?: StyleId | null
   size?: number
   className?: string
 }
 
-export default function Avatar({ seed, avatarId, size = 40, className = '' }: AvatarProps) {
-  // Check if using an animal avatar
-  const animalAvatar = ANIMAL_AVATARS.find((a) => a.id === avatarId)
+export default function Avatar({ seed, styleId, size = 40, className = '' }: AvatarProps) {
+  const avatarDataUri = useMemo(() => {
+    // Find the selected style or default to pixelArt
+    const selectedStyle = AVATAR_STYLES.find((s) => s.id === styleId)?.style || styles.pixelArt
 
-  // Generate pixel art avatar from DiceBear as fallback
-  const pixelAvatar = useMemo(() => {
-    if (animalAvatar) return null
-    const avatar = createAvatar(pixelArt, {
+    const avatar = createAvatar(selectedStyle, {
       seed,
       size,
     })
     return avatar.toDataUri()
-  }, [seed, size, animalAvatar])
-
-  if (animalAvatar) {
-    return (
-      <div
-        className={`flex items-center justify-center rounded-full bg-muted ${className}`}
-        style={{ width: size, height: size, fontSize: size * 0.6 }}
-      >
-        {animalAvatar.emoji}
-      </div>
-    )
-  }
+  }, [seed, size, styleId])
 
   return (
     <img
-      src={pixelAvatar!}
+      src={avatarDataUri}
       alt="Avatar"
       className={`rounded-full ${className}`}
       style={{ width: size, height: size }}

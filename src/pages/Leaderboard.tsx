@@ -98,7 +98,7 @@ export default function Leaderboard() {
                     <span className="text-lg font-bold w-10">
                       {getMedal(index)}
                     </span>
-                    <Avatar seed={user.id} avatarId={user.avatarId} size={32} />
+                    <Avatar seed={user.id} styleId={user.avatarId} size={32} />
                     <span
                       className={`font-medium ${
                         user.id === currentUser?.id ? 'text-primary' : ''
