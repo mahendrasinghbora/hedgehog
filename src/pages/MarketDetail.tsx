@@ -313,6 +313,29 @@ export default function MarketDetail() {
                     {loading ? 'Placing...' : 'Place Bet'}
                   </Button>
                 </div>
+                {betAmount && parseInt(betAmount) > 0 && (() => {
+                  const amount = parseInt(betAmount)
+                  const outcome = market.outcomes.find((o) => o.id === selectedOutcome)
+                  if (!outcome) return null
+
+                  const newOutcomeTotal = outcome.totalBets + amount
+                  const losingPool = market.totalPool - outcome.totalBets
+                  const payout = Math.floor(amount + losingPool * (amount / newOutcomeTotal))
+                  const profit = payout - amount
+
+                  return (
+                    <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Potential payout:</span>
+                        <span className="font-medium">{payout} coins</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Potential profit:</span>
+                        <span className="font-medium text-green-600">+{profit} coins</span>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">
