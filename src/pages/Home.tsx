@@ -30,6 +30,13 @@ export default function Home() {
     return () => unsubscribe()
   }, [])
 
+  const getEffectiveStatus = (market: Market): Market['status'] => {
+    if (market.status === 'open' && new Date() > new Date(market.deadline)) {
+      return 'closed'
+    }
+    return market.status
+  }
+
   const getStatusColor = (status: Market['status']) => {
     switch (status) {
       case 'open':
@@ -47,8 +54,9 @@ export default function Home() {
       market.title.toLowerCase().includes(search.toLowerCase()) ||
       market.description?.toLowerCase().includes(search.toLowerCase())
 
+    const effectiveStatus = getEffectiveStatus(market)
     const matchesStatus =
-      statusFilter === 'all' || market.status === statusFilter
+      statusFilter === 'all' || effectiveStatus === statusFilter
 
     return matchesSearch && matchesStatus
   })
@@ -109,8 +117,8 @@ export default function Home() {
                     <CardTitle className="text-lg leading-tight">
                       {market.title}
                     </CardTitle>
-                    <Badge className={getStatusColor(market.status)}>
-                      {market.status}
+                    <Badge className={getStatusColor(getEffectiveStatus(market))}>
+                      {getEffectiveStatus(market)}
                     </Badge>
                   </div>
                 </CardHeader>
