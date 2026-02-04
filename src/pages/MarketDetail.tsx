@@ -130,12 +130,29 @@ export default function MarketDetail() {
       const winningOutcome = market.outcomes.find((o) => o.id === outcomeId)!
       const losingPool = market.totalPool - winningOutcome.totalBets
 
+      // Calculate winnings for each bet and track the largest bet
+      const payouts: { odId: string; winnings: number; amount: number }[] = []
       for (const bet of winningBets) {
         const shareOfPool = bet.amount / winningOutcome.totalBets
         const winnings = Math.floor(bet.amount + losingPool * shareOfPool)
+        payouts.push({ odId: bet.userId, winnings, amount: bet.amount })
+      }
 
-        await updateDoc(doc(db, 'users', bet.userId), {
-          coins: increment(winnings),
+      // Give rounding remainder to the largest bet winner
+      const totalDistributed = payouts.reduce((sum, p) => sum + p.winnings, 0)
+      const remainder = market.totalPool - totalDistributed
+      if (remainder > 0 && payouts.length > 0) {
+        const largestBetIndex = payouts.reduce(
+          (maxIdx, p, idx, arr) => (p.amount > arr[maxIdx].amount ? idx : maxIdx),
+          0
+        )
+        payouts[largestBetIndex].winnings += remainder
+      }
+
+      // Distribute the winnings
+      for (const payout of payouts) {
+        await updateDoc(doc(db, 'users', payout.odId), {
+          coins: increment(payout.winnings),
         })
       }
 

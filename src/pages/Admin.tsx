@@ -101,16 +101,31 @@ export default function Admin() {
           (b) => b.outcomeId === market.resolvedOutcomeId
         )
 
+        // Calculate payouts and give remainder to largest bet
+        const payouts: { odId: string; winnings: number; amount: number }[] = []
         for (const bet of winningBets) {
           const shareOfPool = bet.amount / winningOutcome.totalBets
           const winnings = Math.floor(bet.amount + losingPool * shareOfPool)
+          payouts.push({ odId: bet.userId, winnings, amount: bet.amount })
+        }
 
-          const balance = userBalances.get(bet.userId) || {
+        const totalDistributed = payouts.reduce((sum, p) => sum + p.winnings, 0)
+        const remainder = market.totalPool - totalDistributed
+        if (remainder > 0 && payouts.length > 0) {
+          const largestBetIndex = payouts.reduce(
+            (maxIdx, p, idx, arr) => (p.amount > arr[maxIdx].amount ? idx : maxIdx),
+            0
+          )
+          payouts[largestBetIndex].winnings += remainder
+        }
+
+        for (const payout of payouts) {
+          const balance = userBalances.get(payout.odId) || {
             totalBets: 0,
             totalWinnings: 0,
           }
-          balance.totalWinnings += winnings
-          userBalances.set(bet.userId, balance)
+          balance.totalWinnings += payout.winnings
+          userBalances.set(payout.odId, balance)
         }
       }
 
