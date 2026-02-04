@@ -367,6 +367,89 @@ export default function MarketDetail() {
           </CardContent>
         </Card>
       )}
+
+      {market.status === 'resolved' && bets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Bet Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {(() => {
+                const winningOutcome = market.outcomes.find(
+                  (o) => o.id === market.resolvedOutcomeId
+                )
+                if (!winningOutcome) return null
+
+                const losingPool = market.totalPool - winningOutcome.totalBets
+                const winningBets = bets.filter(
+                  (b) => b.outcomeId === market.resolvedOutcomeId
+                )
+
+                // Calculate payouts with remainder going to largest bet
+                const payoutMap = new Map<string, number>()
+                if (winningBets.length > 0) {
+                  const payouts: { odId: string; winnings: number; amount: number }[] = []
+                  for (const bet of winningBets) {
+                    const shareOfPool = bet.amount / winningOutcome.totalBets
+                    const winnings = Math.floor(bet.amount + losingPool * shareOfPool)
+                    payouts.push({ odId: bet.id, winnings, amount: bet.amount })
+                  }
+                  const totalDistributed = payouts.reduce((sum, p) => sum + p.winnings, 0)
+                  const remainder = market.totalPool - totalDistributed
+                  if (remainder > 0) {
+                    const largestIdx = payouts.reduce(
+                      (maxIdx, p, idx, arr) => (p.amount > arr[maxIdx].amount ? idx : maxIdx),
+                      0
+                    )
+                    payouts[largestIdx].winnings += remainder
+                  }
+                  payouts.forEach((p) => payoutMap.set(p.odId, p.winnings))
+                }
+
+                return bets.map((bet) => {
+                  const isWinner = bet.outcomeId === market.resolvedOutcomeId
+                  const payout = payoutMap.get(bet.id) || 0
+                  const profit = isWinner ? payout - bet.amount : -bet.amount
+
+                  return (
+                    <div
+                      key={bet.id}
+                      className={`flex justify-between items-center py-2 px-3 rounded-lg ${
+                        isWinner ? 'bg-green-500/10' : 'bg-red-500/10'
+                      }`}
+                    >
+                      <div>
+                        <span className="font-medium">{bet.userName}</span>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          on {market.outcomes.find((o) => o.id === bet.outcomeId)?.label}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">
+                          Bet: {bet.amount}
+                        </div>
+                        <div
+                          className={`font-medium ${
+                            profit > 0
+                              ? 'text-green-600'
+                              : profit < 0
+                              ? 'text-red-600'
+                              : ''
+                          }`}
+                        >
+                          {profit > 0 ? '+' : ''}
+                          {profit}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
