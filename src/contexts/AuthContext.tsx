@@ -12,6 +12,46 @@ import { User } from '@/types'
 
 const STARTING_COINS = 1000
 
+async function generateUniqueHandle(displayName: string): Promise<{ handle: string; handleLower: string }> {
+  // Convert display name to handle format
+  let baseHandle = displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '_') // Replace non-alphanumeric with underscore
+    .replace(/_+/g, '_') // Remove consecutive underscores
+    .replace(/^_|_$/g, '') // Remove leading/trailing underscores
+    .slice(0, 15) // Leave room for numbers
+
+  // Ensure minimum length
+  if (baseHandle.length < 3) {
+    baseHandle = 'user_' + baseHandle
+  }
+
+  // Check if handle is taken, append random number if needed
+  let handle = baseHandle
+  let handleLower = handle.toLowerCase()
+  let attempts = 0
+
+  while (attempts < 10) {
+    const q = query(collection(db, 'users'), where('handleLower', '==', handleLower))
+    const snapshot = await getDocs(q)
+
+    if (snapshot.empty) {
+      return { handle, handleLower }
+    }
+
+    // Handle taken, append random number
+    const randomNum = Math.floor(Math.random() * 9000) + 1000
+    handle = `${baseHandle}${randomNum}`
+    handleLower = handle.toLowerCase()
+    attempts++
+  }
+
+  // Fallback: use timestamp
+  handle = `${baseHandle}${Date.now()}`
+  handleLower = handle.toLowerCase()
+  return { handle, handleLower }
+}
+
 interface AuthContextType {
   user: User | null
   firebaseUser: FirebaseUser | null
@@ -43,15 +83,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             coins: typeof data.coins === 'number' ? data.coins : STARTING_COINS,
           } as User)
         } else {
-          // Create new user with starting coins
+          // Create new user with starting coins and auto-generated handle
+          const displayName = fbUser.displayName || 'Anonymous'
+          const { handle, handleLower } = await generateUniqueHandle(displayName)
+
           const newUser: User = {
             id: fbUser.uid,
-            displayName: fbUser.displayName || 'Anonymous',
+            displayName,
             email: fbUser.email || '',
             coins: STARTING_COINS,
+            handle,
             createdAt: new Date(),
           }
-          await setDoc(doc(db, 'users', fbUser.uid), newUser)
+          await setDoc(doc(db, 'users', fbUser.uid), { ...newUser, handleLower })
           setUser(newUser)
         }
       } else {
