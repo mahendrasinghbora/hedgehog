@@ -4,6 +4,7 @@ export interface User {
   email: string
   coins: number
   avatarId?: string
+  isAdmin?: boolean
   createdAt: Date
 }
 

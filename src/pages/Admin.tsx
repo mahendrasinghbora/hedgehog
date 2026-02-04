@@ -174,6 +174,12 @@ export default function Admin() {
     )
   }
 
+  if (!user.isAdmin) {
+    return (
+      <div className="text-center py-8">You do not have permission to access this page.</div>
+    )
+  }
+
   const needsCorrection = corrections.filter((c) => c.difference !== 0)
 
   return (
