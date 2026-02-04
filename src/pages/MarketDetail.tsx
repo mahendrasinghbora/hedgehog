@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   doc,
-  getDoc,
   updateDoc,
   collection,
   query,
@@ -135,13 +134,9 @@ export default function MarketDetail() {
         const shareOfPool = bet.amount / winningOutcome.totalBets
         const winnings = Math.floor(bet.amount + losingPool * shareOfPool)
 
-        const userDoc = await getDoc(doc(db, 'users', bet.userId))
-        if (userDoc.exists()) {
-          const currentCoins = userDoc.data().coins || 0
-          await updateDoc(doc(db, 'users', bet.userId), {
-            coins: currentCoins + winnings,
-          })
-        }
+        await updateDoc(doc(db, 'users', bet.userId), {
+          coins: increment(winnings),
+        })
       }
 
       navigate('/')

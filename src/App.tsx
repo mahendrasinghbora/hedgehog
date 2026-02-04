@@ -8,6 +8,7 @@ import MarketDetail from '@/pages/MarketDetail'
 import GetStarted from '@/pages/GetStarted'
 import Leaderboard from '@/pages/Leaderboard'
 import Profile from '@/pages/Profile'
+import Admin from '@/pages/Admin'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -45,6 +46,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Admin />
             </ProtectedRoute>
           }
         />
