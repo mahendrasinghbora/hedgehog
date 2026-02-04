@@ -77,6 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userDoc = await getDoc(doc(db, 'users', fbUser.uid))
         if (userDoc.exists()) {
           const data = userDoc.data()
+
+          // Auto-generate handle for existing users without one
+          if (!data.handle) {
+            const displayName = data.displayName || fbUser.displayName || 'Anonymous'
+            const { handle, handleLower } = await generateUniqueHandle(displayName)
+            await updateDoc(doc(db, 'users', fbUser.uid), { handle, handleLower })
+            data.handle = handle
+          }
+
           setUser({
             ...data,
             id: fbUser.uid,
