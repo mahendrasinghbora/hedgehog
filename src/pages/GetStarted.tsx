@@ -79,6 +79,14 @@ export default function GetStarted() {
             1,000 coin pool. If you bet 100 coins on Yes (1/3 of Yes bets),
             you'd win ~333 coins total!
           </p>
+          <div className="mt-3 p-3 bg-primary/10 rounded-lg">
+            <p className="font-medium text-sm">Odd Coin Rule</p>
+            <p className="text-muted-foreground text-xs mt-1">
+              When coins can't be divided evenly among winners, any remainder
+              goes to the person who placed the largest winning bet. This ensures
+              no coins are lost in the system.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
