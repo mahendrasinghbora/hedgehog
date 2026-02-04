@@ -6,7 +6,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { User } from '@/types'
 
@@ -74,13 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateCoins = async (newAmount: number) => {
     if (!user) return
-    await setDoc(doc(db, 'users', user.id), { ...user, coins: newAmount })
+    await updateDoc(doc(db, 'users', user.id), { coins: newAmount })
     setUser({ ...user, coins: newAmount })
   }
 
   const updateAvatar = async (avatarId: string | null) => {
     if (!user) return
-    await setDoc(doc(db, 'users', user.id), { ...user, avatarId })
+    await updateDoc(doc(db, 'users', user.id), { avatarId })
     setUser({ ...user, avatarId: avatarId || undefined })
   }
 

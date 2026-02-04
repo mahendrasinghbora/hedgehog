@@ -7,9 +7,9 @@ import {
   query,
   where,
   onSnapshot,
-  addDoc,
   increment,
   Timestamp,
+  runTransaction,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Market, Bet } from '@/types'
@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge'
 
 export default function MarketDetail() {
   const { id } = useParams<{ id: string }>()
-  const { user, updateCoins } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [market, setMarket] = useState<Market | null>(null)
   const [bets, setBets] = useState<Bet[]>([])
@@ -68,28 +68,55 @@ export default function MarketDetail() {
 
     setLoading(true)
     try {
-      await addDoc(collection(db, 'bets'), {
-        marketId: market.id,
-        outcomeId: selectedOutcome,
-        userId: user.id,
-        userName: user.displayName,
-        amount,
-        createdAt: new Date(),
+      await runTransaction(db, async (transaction) => {
+        // Read current user coins to verify they still have enough
+        const userRef = doc(db, 'users', user.id)
+        const userDoc = await transaction.get(userRef)
+        if (!userDoc.exists()) throw new Error('User not found')
+
+        const currentCoins = userDoc.data().coins || 0
+        if (currentCoins < amount) throw new Error('Insufficient coins')
+
+        // Read current market state
+        const marketRef = doc(db, 'markets', market.id)
+        const marketDoc = await transaction.get(marketRef)
+        if (!marketDoc.exists()) throw new Error('Market not found')
+
+        const marketData = marketDoc.data()
+        if (marketData.status !== 'open') throw new Error('Market is not open')
+
+        // Update market outcomes and pool
+        const outcomes = [...marketData.outcomes]
+        const outcomeIndex = outcomes.findIndex((o: { id: string }) => o.id === selectedOutcome)
+        if (outcomeIndex === -1) throw new Error('Outcome not found')
+
+        outcomes[outcomeIndex] = {
+          ...outcomes[outcomeIndex],
+          totalBets: outcomes[outcomeIndex].totalBets + amount,
+        }
+
+        // Create bet document
+        const betRef = doc(collection(db, 'bets'))
+        transaction.set(betRef, {
+          marketId: market.id,
+          outcomeId: selectedOutcome,
+          userId: user.id,
+          userName: user.displayName,
+          amount,
+          createdAt: new Date(),
+        })
+
+        // Update market
+        transaction.update(marketRef, {
+          outcomes,
+          totalPool: (marketData.totalPool || 0) + amount,
+        })
+
+        // Deduct coins from user
+        transaction.update(userRef, {
+          coins: currentCoins - amount,
+        })
       })
-
-      const outcomeIndex = market.outcomes.findIndex((o) => o.id === selectedOutcome)
-      const updatedOutcomes = [...market.outcomes]
-      updatedOutcomes[outcomeIndex] = {
-        ...updatedOutcomes[outcomeIndex],
-        totalBets: updatedOutcomes[outcomeIndex].totalBets + amount,
-      }
-
-      await updateDoc(doc(db, 'markets', market.id), {
-        outcomes: updatedOutcomes,
-        totalPool: increment(amount),
-      })
-
-      await updateCoins(user.coins - amount)
 
       setBetAmount('')
       setSelectedOutcome(null)
