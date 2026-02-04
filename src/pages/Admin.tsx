@@ -211,16 +211,16 @@ export default function Admin() {
               <p>No users found.</p>
             ) : (
               <>
-                <div className="max-h-96 overflow-y-auto">
-                  <table className="w-full text-sm">
+                <div className="max-h-96 overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
                     <thead className="sticky top-0 bg-background">
                       <tr className="border-b">
-                        <th className="text-left py-2">User</th>
-                        <th className="text-right py-2">Current</th>
-                        <th className="text-right py-2">Correct</th>
-                        <th className="text-right py-2">Diff</th>
-                        <th className="text-right py-2">Bets</th>
-                        <th className="text-right py-2">Winnings</th>
+                        <th className="text-left py-2 pr-4">User</th>
+                        <th className="text-right py-2 px-3">Current</th>
+                        <th className="text-right py-2 px-3">Correct</th>
+                        <th className="text-right py-2 px-3">Diff</th>
+                        <th className="text-right py-2 px-3">Bets</th>
+                        <th className="text-right py-2 pl-3">Winnings</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -231,11 +231,11 @@ export default function Admin() {
                             c.difference !== 0 ? 'bg-yellow-500/10' : ''
                           }`}
                         >
-                          <td className="py-2">{c.displayName}</td>
-                          <td className="text-right">{c.currentCoins}</td>
-                          <td className="text-right">{c.correctCoins}</td>
+                          <td className="py-2 pr-4">{c.displayName}</td>
+                          <td className="text-right px-3">{c.currentCoins}</td>
+                          <td className="text-right px-3">{c.correctCoins}</td>
                           <td
-                            className={`text-right font-medium ${
+                            className={`text-right px-3 font-medium ${
                               c.difference > 0
                                 ? 'text-green-600'
                                 : c.difference < 0
@@ -246,8 +246,8 @@ export default function Admin() {
                             {c.difference > 0 ? '+' : ''}
                             {c.difference}
                           </td>
-                          <td className="text-right">{c.totalBets}</td>
-                          <td className="text-right">{c.totalWinnings}</td>
+                          <td className="text-right px-3">{c.totalBets}</td>
+                          <td className="text-right pl-3">{c.totalWinnings}</td>
                         </tr>
                       ))}
                     </tbody>
