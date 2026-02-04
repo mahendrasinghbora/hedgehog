@@ -10,10 +10,12 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { Bet, Market } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import Avatar, { AVATAR_STYLES } from '@/components/Avatar'
 
 interface BetWithMarket extends Bet {
@@ -21,7 +23,8 @@ interface BetWithMarket extends Bet {
 }
 
 export default function Profile() {
-  const { user, updateAvatar } = useAuth()
+  const { user, updateAvatar, updateHandle } = useAuth()
+  const { showToast } = useToast()
   const [bets, setBets] = useState<BetWithMarket[]>([])
   const [stats, setStats] = useState({
     totalBets: 0,
@@ -31,6 +34,8 @@ export default function Profile() {
   })
   const [loading, setLoading] = useState(true)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
+  const [handleInput, setHandleInput] = useState('')
+  const [savingHandle, setSavingHandle] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -128,6 +133,19 @@ export default function Profile() {
     setShowAvatarPicker(false)
   }
 
+  const handleSaveHandle = async () => {
+    if (!handleInput.trim()) return
+    setSavingHandle(true)
+    const result = await updateHandle(handleInput.trim())
+    if (result.success) {
+      showToast('Handle saved!', 'success')
+      setHandleInput('')
+    } else {
+      showToast(result.error || 'Failed to save handle', 'error')
+    }
+    setSavingHandle(false)
+  }
+
   if (!user) {
     return (
       <div className="text-center py-8">
@@ -162,11 +180,38 @@ export default function Profile() {
             <div>
               <CardTitle className="text-xl">{user.displayName}</CardTitle>
               <p className="text-sm text-muted-foreground">{user.email}</p>
+              {user.handle && (
+                <p className="text-sm text-primary">@{user.handle}</p>
+              )}
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="text-2xl font-bold">{user.coins} coins</p>
+
+          <div className="pt-2 border-t">
+            <label className="text-sm font-medium">
+              {user.handle ? 'Update Handle' : 'Set Your Handle'}
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Others can tag you in markets using @{user.handle || 'your_handle'}
+            </p>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+                <Input
+                  value={handleInput}
+                  onChange={(e) => setHandleInput(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                  placeholder={user.handle || 'your_handle'}
+                  className="pl-7"
+                  maxLength={20}
+                />
+              </div>
+              <Button onClick={handleSaveHandle} disabled={savingHandle || !handleInput.trim()}>
+                {savingHandle ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

@@ -49,6 +49,12 @@ export default function Home() {
   }
 
   const filteredMarkets = markets.filter((market) => {
+    // Hide markets where user is tagged (unless resolved)
+    const isTagged = user && market.taggedUserIds?.includes(user.id)
+    if (isTagged && market.status !== 'resolved') {
+      return false
+    }
+
     const matchesSearch =
       search === '' ||
       market.title.toLowerCase().includes(search.toLowerCase()) ||

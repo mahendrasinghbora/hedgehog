@@ -4,6 +4,7 @@ export interface User {
   email: string
   coins: number
   avatarId?: string
+  handle?: string
   isAdmin?: boolean
   createdAt: Date
 }
@@ -17,6 +18,7 @@ export interface Market {
   outcomes: Outcome[]
   status: 'open' | 'closed' | 'resolved'
   resolvedOutcomeId?: string
+  taggedUserIds?: string[]
   deadline: Date
   createdAt: Date
   totalPool: number

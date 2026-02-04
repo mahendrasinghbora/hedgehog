@@ -6,7 +6,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { User } from '@/types'
 
@@ -20,6 +20,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   updateCoins: (newAmount: number) => Promise<void>
   updateAvatar: (avatarId: string | null) => Promise<void>
+  updateHandle: (handle: string) => Promise<{ success: boolean; error?: string }>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -84,9 +85,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({ ...user, avatarId: avatarId || undefined })
   }
 
+  const updateHandle = async (handle: string): Promise<{ success: boolean; error?: string }> => {
+    if (!user) return { success: false, error: 'Not logged in' }
+
+    // Validate handle format (alphanumeric and underscores only, 3-20 chars)
+    const handleRegex = /^[a-zA-Z0-9_]{3,20}$/
+    if (!handleRegex.test(handle)) {
+      return { success: false, error: 'Handle must be 3-20 characters, alphanumeric and underscores only' }
+    }
+
+    // Check if handle is already taken (case insensitive)
+    const handleLower = handle.toLowerCase()
+    const q = query(collection(db, 'users'), where('handleLower', '==', handleLower))
+    const snapshot = await getDocs(q)
+
+    if (!snapshot.empty && snapshot.docs[0].id !== user.id) {
+      return { success: false, error: 'Handle is already taken' }
+    }
+
+    await updateDoc(doc(db, 'users', user.id), { handle, handleLower })
+    setUser({ ...user, handle })
+    return { success: true }
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, firebaseUser, loading, signInWithGoogle, signOut, updateCoins, updateAvatar }}
+      value={{ user, firebaseUser, loading, signInWithGoogle, signOut, updateCoins, updateAvatar, updateHandle }}
     >
       {children}
     </AuthContext.Provider>

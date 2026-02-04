@@ -240,6 +240,18 @@ export default function MarketDetail() {
     return <div className="text-center py-8">Loading...</div>
   }
 
+  // Block access if user is tagged and market is not resolved
+  const isTagged = user && market.taggedUserIds?.includes(user.id)
+  if (isTagged && market.status !== 'resolved') {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">
+          This market is hidden from you until it's resolved.
+        </p>
+      </div>
+    )
+  }
+
   const isCreator = user?.id === market.creatorId
   const userBets = bets.filter((b) => b.userId === user?.id)
 

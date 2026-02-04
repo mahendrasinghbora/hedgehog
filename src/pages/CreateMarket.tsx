@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { collection, addDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import MentionInput, { extractMentions, getUserIdsFromHandles } from '@/components/MentionInput'
 
 export default function CreateMarket() {
   const { user } = useAuth()
+  const { showToast } = useToast()
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -46,6 +49,11 @@ export default function CreateMarket() {
           totalBets: 0,
         }))
 
+      // Extract mentioned handles from title and description
+      const allText = `${title} ${description}`
+      const mentionedHandles = extractMentions(allText)
+      const taggedUserIds = await getUserIdsFromHandles(mentionedHandles)
+
       await addDoc(collection(db, 'markets'), {
         title,
         description,
@@ -56,11 +64,14 @@ export default function CreateMarket() {
         deadline: new Date(deadline),
         createdAt: new Date(),
         totalPool: 0,
+        taggedUserIds,
       })
 
+      showToast('Market created!', 'success')
       navigate('/')
     } catch (error) {
       console.error('Failed to create market:', error)
+      showToast('Failed to create market', 'error')
     } finally {
       setLoading(false)
     }
@@ -76,20 +87,20 @@ export default function CreateMarket() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Question</label>
-              <Input
+              <MentionInput
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Will it rain tomorrow?"
-                required
+                onChange={setTitle}
+                placeholder="Will @john finish the project? (type @ to mention)"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Description (optional)</label>
-              <Input
+              <MentionInput
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Add more details..."
+                onChange={setDescription}
+                placeholder="Add more details... Tag users with @handle"
+                multiline
               />
             </div>
 
