@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { ToastProvider } from '@/contexts/ToastContext'
 import Layout from '@/components/Layout'
 import Home from '@/pages/Home'
 import Login from '@/pages/Login'
@@ -66,7 +67,9 @@ function App() {
   return (
     <HashRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
       </AuthProvider>
     </HashRouter>
   )

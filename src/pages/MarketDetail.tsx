@@ -14,20 +14,47 @@ import {
 import { db } from '@/lib/firebase'
 import { Market, Bet } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+function formatTimeRemaining(deadline: Date): string {
+  const now = new Date()
+  const diff = new Date(deadline).getTime() - now.getTime()
+
+  if (diff <= 0) return 'Deadline passed'
+
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (days > 0) return `${days} day${days > 1 ? 's' : ''} left`
+  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} left`
+  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} left`
+  return 'Less than a minute left'
+}
 
 export default function MarketDetail() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
+  const { showToast } = useToast()
   const navigate = useNavigate()
   const [market, setMarket] = useState<Market | null>(null)
   const [bets, setBets] = useState<Bet[]>([])
   const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null)
   const [betAmount, setBetAmount] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -61,11 +88,25 @@ export default function MarketDetail() {
   const isDeadlinePassed = market ? new Date() > new Date(market.deadline) : false
   const canBet = market?.status === 'open' && !isDeadlinePassed
 
+  const handlePlaceBet = () => {
+    if (!user || !betAmount) return
+    const amount = parseInt(betAmount)
+
+    // Show confirmation for large bets (>50% of balance)
+    if (amount > user.coins * 0.5) {
+      setShowConfirmDialog(true)
+      return
+    }
+
+    placeBet()
+  }
+
   const placeBet = async () => {
     if (!user || !market || !selectedOutcome || !betAmount || !canBet) return
     const amount = parseInt(betAmount)
     if (amount <= 0 || amount > user.coins) return
 
+    setShowConfirmDialog(false)
     setLoading(true)
     try {
       await runTransaction(db, async (transaction) => {
@@ -118,10 +159,12 @@ export default function MarketDetail() {
         })
       })
 
+      showToast(`Bet of ${amount} coins placed!`, 'success')
       setBetAmount('')
       setSelectedOutcome(null)
     } catch (error) {
       console.error('Failed to place bet:', error)
+      showToast('Failed to place bet', 'error')
     } finally {
       setLoading(false)
     }
@@ -183,9 +226,11 @@ export default function MarketDetail() {
         })
       }
 
+      showToast('Market resolved! Winnings distributed.', 'success')
       navigate('/')
     } catch (error) {
       console.error('Failed to resolve market:', error)
+      showToast('Failed to resolve market', 'error')
     } finally {
       setLoading(false)
     }
@@ -230,6 +275,9 @@ export default function MarketDetail() {
           </div>
           <div className="text-sm text-muted-foreground">
             Deadline: {formatDeadline(market.deadline)}
+            {!isDeadlinePassed && (
+              <span className="text-primary ml-2">({formatTimeRemaining(market.deadline)})</span>
+            )}
             {isDeadlinePassed && <span className="text-yellow-600 ml-2">(passed)</span>}
           </div>
           <div className="font-medium">{market.totalPool} coins in pool</div>
@@ -309,7 +357,7 @@ export default function MarketDetail() {
                     min="1"
                     max={user.coins}
                   />
-                  <Button onClick={placeBet} disabled={loading}>
+                  <Button onClick={handlePlaceBet} disabled={loading}>
                     {loading ? 'Placing...' : 'Place Bet'}
                   </Button>
                 </div>
@@ -500,6 +548,26 @@ export default function MarketDetail() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Large Bet</DialogTitle>
+            <DialogDescription>
+              You're about to bet <strong>{betAmount} coins</strong>, which is more than
+              50% of your balance. Are you sure you want to proceed?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={placeBet} disabled={loading}>
+              {loading ? 'Placing...' : 'Confirm Bet'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
