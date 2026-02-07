@@ -29,7 +29,7 @@ function AppRoutes() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/login" element={<Login />} />
         <Route path="/get-started" element={<GetStarted />} />
         <Route
@@ -40,8 +40,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="/market/:id" element={<MarketDetail />} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/market/:id" element={<ProtectedRoute><MarketDetail /></ProtectedRoute>} />
+        <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
         <Route
           path="/profile"
           element={
