@@ -1,11 +1,15 @@
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Navigate, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Login() {
-  const { signInWithGoogle } = useAuth()
+  const { user, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
+
+  if (user) {
+    return <Navigate to="/" />
+  }
 
   const handleSignIn = async () => {
     try {
