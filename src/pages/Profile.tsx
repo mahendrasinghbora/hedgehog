@@ -17,13 +17,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Avatar, { AVATAR_STYLES } from '@/components/Avatar'
+import { Pencil } from 'lucide-react'
 
 interface BetWithMarket extends Bet {
   market?: Market
 }
 
 export default function Profile() {
-  const { user, updateAvatar, updateHandle } = useAuth()
+  const { user, updateAvatar, updateHandle, updateDisplayName } = useAuth()
   const { showToast } = useToast()
   const [bets, setBets] = useState<BetWithMarket[]>([])
   const [stats, setStats] = useState({
@@ -36,6 +37,10 @@ export default function Profile() {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [handleInput, setHandleInput] = useState('')
   const [savingHandle, setSavingHandle] = useState(false)
+  const [editingHandle, setEditingHandle] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  const [editingName, setEditingName] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -133,6 +138,20 @@ export default function Profile() {
     setShowAvatarPicker(false)
   }
 
+  const handleSaveName = async () => {
+    if (!nameInput.trim()) return
+    setSavingName(true)
+    try {
+      await updateDisplayName(nameInput.trim())
+      showToast('Name updated!', 'success')
+      setNameInput('')
+      setEditingName(false)
+    } catch {
+      showToast('Failed to update name', 'error')
+    }
+    setSavingName(false)
+  }
+
   const handleSaveHandle = async () => {
     if (!handleInput.trim()) return
     setSavingHandle(true)
@@ -140,6 +159,7 @@ export default function Profile() {
     if (result.success) {
       showToast('Handle saved!', 'success')
       setHandleInput('')
+      setEditingHandle(false)
     } else {
       showToast(result.error || 'Failed to save handle', 'error')
     }
@@ -177,41 +197,80 @@ export default function Profile() {
                 <span className="text-white text-xs">Edit</span>
               </div>
             </button>
-            <div>
-              <CardTitle className="text-xl">{user.displayName}</CardTitle>
+            <div className="flex-1 min-w-0">
+              {editingName ? (
+                <div className="flex gap-2 items-center">
+                  <Input
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder={user.displayName}
+                    maxLength={50}
+                    className="h-8 text-lg font-semibold"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveName()
+                      if (e.key === 'Escape') { setEditingName(false); setNameInput('') }
+                    }}
+                  />
+                  <Button size="sm" onClick={handleSaveName} disabled={savingName || !nameInput.trim()}>
+                    {savingName ? '...' : 'Save'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditingName(false); setNameInput('') }}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setEditingName(true); setNameInput(user.displayName) }}
+                  className="text-left group"
+                >
+                  <CardTitle className="text-xl group-hover:underline inline-flex items-center gap-1.5">
+                    {user.displayName}
+                    <Pencil className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </CardTitle>
+                </button>
+              )}
               <p className="text-sm text-muted-foreground">{user.email}</p>
-              {user.handle && (
-                <p className="text-sm text-primary">@{user.handle}</p>
+              {editingHandle ? (
+                <div className="flex gap-2 items-center mt-1">
+                  <div className="relative flex-1">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                    <Input
+                      value={handleInput}
+                      onChange={(e) => setHandleInput(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                      placeholder={user.handle || 'your_handle'}
+                      className="h-7 text-sm pl-6"
+                      maxLength={20}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveHandle()
+                        if (e.key === 'Escape') { setEditingHandle(false); setHandleInput('') }
+                      }}
+                    />
+                  </div>
+                  <Button size="sm" onClick={handleSaveHandle} disabled={savingHandle || !handleInput.trim()}>
+                    {savingHandle ? '...' : 'Save'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditingHandle(false); setHandleInput('') }}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setEditingHandle(true); setHandleInput(user.handle || '') }}
+                  className="text-left group"
+                >
+                  <p className="text-sm text-primary group-hover:underline inline-flex items-center gap-1">
+                    @{user.handle || 'set handle'}
+                    <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </p>
+                </button>
               )}
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <p className="text-2xl font-bold">{user.coins} coins</p>
-
-          <div className="pt-2 border-t">
-            <label className="text-sm font-medium">
-              {user.handle ? 'Update Handle' : 'Set Your Handle'}
-            </label>
-            <p className="text-xs text-muted-foreground mb-2">
-              Others can tag you in markets using @{user.handle || 'your_handle'}
-            </p>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
-                <Input
-                  value={handleInput}
-                  onChange={(e) => setHandleInput(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                  placeholder={user.handle || 'your_handle'}
-                  className="pl-7"
-                  maxLength={20}
-                />
-              </div>
-              <Button onClick={handleSaveHandle} disabled={savingHandle || !handleInput.trim()}>
-                {savingHandle ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 

@@ -61,6 +61,7 @@ interface AuthContextType {
   updateCoins: (newAmount: number) => Promise<void>
   updateAvatar: (avatarId: string | null) => Promise<void>
   updateHandle: (handle: string) => Promise<{ success: boolean; error?: string }>
+  updateDisplayName: (displayName: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -161,13 +162,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true }
   }
 
+  const updateDisplayName = async (displayName: string) => {
+    if (!user) return
+    await updateDoc(doc(db, 'users', user.id), { displayName })
+    setUser({ ...user, displayName })
+  }
+
   if (loading) {
     return null
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, firebaseUser, loading, signInWithGoogle, signOut, updateCoins, updateAvatar, updateHandle }}
+      value={{ user, firebaseUser, loading, signInWithGoogle, signOut, updateCoins, updateAvatar, updateHandle, updateDisplayName }}
     >
       {children}
     </AuthContext.Provider>
