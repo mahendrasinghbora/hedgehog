@@ -161,6 +161,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true }
   }
 
+  if (loading) {
+    return null
+  }
+
   return (
     <AuthContext.Provider
       value={{ user, firebaseUser, loading, signInWithGoogle, signOut, updateCoins, updateAvatar, updateHandle }}
