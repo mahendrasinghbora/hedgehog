@@ -186,48 +186,55 @@ export default function MarketDetail() {
   }
 
   const resolveMarket = async (outcomeId: string) => {
-    if (!market || market.creatorId !== user?.id) return
+    if (!market || !user || market.creatorId !== user.id) return
 
     setLoading(true)
     try {
-      await updateDoc(doc(db, 'markets', market.id), {
-        status: 'resolved',
-        resolvedOutcomeId: outcomeId,
-      })
-
-      // Distribute winnings
-      const winningBets = bets.filter((b) => b.outcomeId === outcomeId)
-      const winningOutcome = market.outcomes.find((o) => o.id === outcomeId)!
-      const losingPool = market.totalPool - winningOutcome.totalBets
-
-      // Calculate winnings for each bet and track the largest bet
-      const payouts: { odId: string; winnings: number; amount: number }[] = []
-      for (const bet of winningBets) {
-        const shareOfPool = bet.amount / winningOutcome.totalBets
-        const winnings = Math.floor(bet.amount + losingPool * shareOfPool)
-        payouts.push({ odId: bet.userId, winnings, amount: bet.amount })
-      }
-
-      // Give rounding remainder to the largest bet winner
-      const totalDistributed = payouts.reduce((sum, p) => sum + p.winnings, 0)
-      const remainder = market.totalPool - totalDistributed
-      if (remainder > 0 && payouts.length > 0) {
-        const largestBetIndex = payouts.reduce(
-          (maxIdx, p, idx, arr) => (p.amount > arr[maxIdx].amount ? idx : maxIdx),
-          0
-        )
-        payouts[largestBetIndex].winnings += remainder
-      }
-
-      // Distribute the winnings
-      for (const payout of payouts) {
-        await updateDoc(doc(db, 'users', payout.odId), {
-          coins: increment(payout.winnings),
+      if (user.isAdmin) {
+        // Admin creators resolve directly with payout
+        await updateDoc(doc(db, 'markets', market.id), {
+          status: 'resolved',
+          resolvedOutcomeId: outcomeId,
         })
-      }
 
-      showToast('Market resolved! Winnings distributed.', 'success')
-      navigate('/')
+        // Distribute winnings
+        const winningBets = bets.filter((b) => b.outcomeId === outcomeId)
+        const winningOutcome = market.outcomes.find((o) => o.id === outcomeId)!
+        const losingPool = market.totalPool - winningOutcome.totalBets
+
+        const payouts: { odId: string; winnings: number; amount: number }[] = []
+        for (const bet of winningBets) {
+          const shareOfPool = bet.amount / winningOutcome.totalBets
+          const winnings = Math.floor(bet.amount + losingPool * shareOfPool)
+          payouts.push({ odId: bet.userId, winnings, amount: bet.amount })
+        }
+
+        const totalDistributed = payouts.reduce((sum, p) => sum + p.winnings, 0)
+        const remainder = market.totalPool - totalDistributed
+        if (remainder > 0 && payouts.length > 0) {
+          const largestBetIndex = payouts.reduce(
+            (maxIdx, p, idx, arr) => (p.amount > arr[maxIdx].amount ? idx : maxIdx),
+            0
+          )
+          payouts[largestBetIndex].winnings += remainder
+        }
+
+        for (const payout of payouts) {
+          await updateDoc(doc(db, 'users', payout.odId), {
+            coins: increment(payout.winnings),
+          })
+        }
+
+        showToast('Market resolved! Winnings distributed.', 'success')
+        navigate('/')
+      } else {
+        // Non-admin creators submit for admin approval
+        await updateDoc(doc(db, 'markets', market.id), {
+          pendingResolutionOutcomeId: outcomeId,
+        })
+
+        showToast('Resolution submitted for admin approval.', 'success')
+      }
     } catch (error) {
       console.error('Failed to resolve market:', error)
       showToast('Failed to resolve market', 'error')
@@ -267,14 +274,20 @@ export default function MarketDetail() {
             <CardTitle className="text-xl">{market.title}</CardTitle>
             <Badge
               className={
-                market.status === 'open' && !isDeadlinePassed
+                market.pendingResolutionOutcomeId && market.status !== 'resolved'
+                  ? 'bg-orange-500'
+                  : market.status === 'open' && !isDeadlinePassed
                   ? 'bg-green-500'
                   : market.status === 'closed' || isDeadlinePassed
                   ? 'bg-yellow-500'
                   : 'bg-gray-500'
               }
             >
-              {market.status === 'open' && isDeadlinePassed ? 'closed' : market.status}
+              {market.pendingResolutionOutcomeId && market.status !== 'resolved'
+                ? 'pending'
+                : market.status === 'open' && isDeadlinePassed
+                ? 'closed'
+                : market.status}
             </Badge>
           </div>
         </CardHeader>
@@ -321,6 +334,8 @@ export default function MarketDetail() {
                 } ${
                   market.resolvedOutcomeId === outcome.id
                     ? 'border-green-500 bg-green-500/10'
+                    : market.pendingResolutionOutcomeId === outcome.id && market.status !== 'resolved'
+                    ? 'border-orange-500 bg-orange-500/10'
                     : ''
                 }`}
                 onClick={() => canBet && setSelectedOutcome(outcome.id)}
@@ -453,14 +468,16 @@ export default function MarketDetail() {
         </Card>
       )}
 
-      {isCreator && (market.status === 'closed' || isDeadlinePassed) && market.status !== 'resolved' && (
+      {isCreator && (market.status === 'closed' || isDeadlinePassed) && market.status !== 'resolved' && !market.pendingResolutionOutcomeId && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Resolve Market</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Select the winning outcome to resolve this market and distribute winnings.
+              {user?.isAdmin
+                ? 'Select the winning outcome to resolve this market and distribute winnings.'
+                : 'Select the winning outcome. An admin will review and approve before winnings are distributed.'}
             </p>
             <div className="flex flex-wrap gap-2">
               {market.outcomes.map((outcome) => (
@@ -474,6 +491,25 @@ export default function MarketDetail() {
                 </Button>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {market.pendingResolutionOutcomeId && market.status !== 'resolved' && (
+        <Card className="border-orange-500">
+          <CardHeader>
+            <CardTitle className="text-lg">Pending Approval</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm">
+              Selected winner:{' '}
+              <strong>
+                {market.outcomes.find((o) => o.id === market.pendingResolutionOutcomeId)?.label}
+              </strong>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Waiting for an admin to approve this resolution before winnings are distributed.
+            </p>
           </CardContent>
         </Card>
       )}

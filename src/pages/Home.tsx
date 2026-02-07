@@ -37,7 +37,10 @@ export default function Home() {
     return market.status
   }
 
-  const getStatusColor = (status: Market['status']) => {
+  const getStatusColor = (status: Market['status'], market?: Market) => {
+    if (market?.pendingResolutionOutcomeId && market.status !== 'resolved') {
+      return 'bg-orange-500'
+    }
     switch (status) {
       case 'open':
         return 'bg-green-500'
@@ -46,6 +49,13 @@ export default function Home() {
       case 'resolved':
         return 'bg-gray-500'
     }
+  }
+
+  const getStatusLabel = (status: Market['status'], market?: Market) => {
+    if (market?.pendingResolutionOutcomeId && market.status !== 'resolved') {
+      return 'pending'
+    }
+    return status
   }
 
   const filteredMarkets = markets.filter((market) => {
@@ -123,8 +133,8 @@ export default function Home() {
                     <CardTitle className="text-lg leading-tight">
                       {market.title}
                     </CardTitle>
-                    <Badge className={getStatusColor(getEffectiveStatus(market))}>
-                      {getEffectiveStatus(market)}
+                    <Badge className={getStatusColor(getEffectiveStatus(market), market)}>
+                      {getStatusLabel(getEffectiveStatus(market), market)}
                     </Badge>
                   </div>
                 </CardHeader>

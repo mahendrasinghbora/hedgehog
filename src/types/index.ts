@@ -18,6 +18,7 @@ export interface Market {
   outcomes: Outcome[]
   status: 'open' | 'closed' | 'resolved'
   resolvedOutcomeId?: string
+  pendingResolutionOutcomeId?: string
   taggedUserIds?: string[]
   deadline: Date
   createdAt: Date

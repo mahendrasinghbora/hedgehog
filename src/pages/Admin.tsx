@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   collection,
   getDocs,
@@ -6,11 +6,16 @@ import {
   doc,
   query,
   where,
+  onSnapshot,
+  increment,
+  deleteField,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Market, Bet } from '@/types'
 
 const STARTING_COINS = 1000
@@ -27,10 +32,98 @@ interface UserCorrection {
 
 export default function Admin() {
   const { user } = useAuth()
+  const { showToast } = useToast()
   const [corrections, setCorrections] = useState<UserCorrection[]>([])
   const [loading, setLoading] = useState(false)
   const [calculated, setCalculated] = useState(false)
   const [applied, setApplied] = useState(false)
+  const [pendingMarkets, setPendingMarkets] = useState<Market[]>([])
+  const [pendingLoading, setPendingLoading] = useState<string | null>(null)
+
+  useEffect(() => {
+    const q = query(collection(db, 'markets'), where('status', '==', 'closed'))
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const markets = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as Market))
+        .filter((m) => m.pendingResolutionOutcomeId)
+      setPendingMarkets(markets)
+    })
+    return () => unsubscribe()
+  }, [])
+
+  const approveResolution = async (market: Market) => {
+    if (!market.pendingResolutionOutcomeId) return
+    const outcomeId = market.pendingResolutionOutcomeId
+
+    setPendingLoading(market.id)
+    try {
+      // Fetch bets for this market
+      const betsQuery = query(collection(db, 'bets'), where('marketId', '==', market.id))
+      const betsSnapshot = await getDocs(betsQuery)
+      const marketBets: Bet[] = betsSnapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as Bet[]
+
+      // Calculate payouts
+      const winningBets = marketBets.filter((b) => b.outcomeId === outcomeId)
+      const winningOutcome = market.outcomes.find((o) => o.id === outcomeId)!
+      const losingPool = market.totalPool - winningOutcome.totalBets
+
+      const payouts: { userId: string; winnings: number; amount: number }[] = []
+      for (const bet of winningBets) {
+        const shareOfPool = bet.amount / winningOutcome.totalBets
+        const winnings = Math.floor(bet.amount + losingPool * shareOfPool)
+        payouts.push({ userId: bet.userId, winnings, amount: bet.amount })
+      }
+
+      const totalDistributed = payouts.reduce((sum, p) => sum + p.winnings, 0)
+      const remainder = market.totalPool - totalDistributed
+      if (remainder > 0 && payouts.length > 0) {
+        const largestBetIndex = payouts.reduce(
+          (maxIdx, p, idx, arr) => (p.amount > arr[maxIdx].amount ? idx : maxIdx),
+          0
+        )
+        payouts[largestBetIndex].winnings += remainder
+      }
+
+      // Update market status
+      await updateDoc(doc(db, 'markets', market.id), {
+        status: 'resolved',
+        resolvedOutcomeId: outcomeId,
+        pendingResolutionOutcomeId: deleteField(),
+      })
+
+      // Distribute winnings
+      for (const payout of payouts) {
+        await updateDoc(doc(db, 'users', payout.userId), {
+          coins: increment(payout.winnings),
+        })
+      }
+
+      showToast(`Market "${market.title}" resolved! Winnings distributed.`, 'success')
+    } catch (error) {
+      console.error('Failed to approve resolution:', error)
+      showToast('Failed to approve resolution', 'error')
+    } finally {
+      setPendingLoading(null)
+    }
+  }
+
+  const rejectResolution = async (market: Market) => {
+    setPendingLoading(market.id)
+    try {
+      await updateDoc(doc(db, 'markets', market.id), {
+        pendingResolutionOutcomeId: deleteField(),
+      })
+      showToast('Resolution rejected. Creator can resubmit.', 'info')
+    } catch (error) {
+      console.error('Failed to reject resolution:', error)
+      showToast('Failed to reject resolution', 'error')
+    } finally {
+      setPendingLoading(null)
+    }
+  }
 
   const calculateCorrections = async () => {
     setLoading(true)
@@ -199,6 +292,65 @@ export default function Admin() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Pending Resolutions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {pendingMarkets.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No markets pending resolution.</p>
+          ) : (
+            pendingMarkets.map((market) => {
+              const pendingOutcome = market.outcomes.find(
+                (o) => o.id === market.pendingResolutionOutcomeId
+              )
+              return (
+                <div
+                  key={market.id}
+                  className="p-4 rounded-lg border space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium">{market.title}</div>
+                      <div className="text-sm text-muted-foreground">
+                        by {market.creatorName} &middot; {market.totalPool} coins in pool
+                      </div>
+                    </div>
+                    <Badge className="bg-orange-500">pending</Badge>
+                  </div>
+                  <div className="text-sm">
+                    Selected winner: <strong>{pendingOutcome?.label}</strong>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    All outcomes:{' '}
+                    {market.outcomes
+                      .map((o) => `${o.label} (${o.totalBets} coins)`)
+                      .join(', ')}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => approveResolution(market)}
+                      disabled={pendingLoading === market.id}
+                    >
+                      {pendingLoading === market.id ? 'Approving...' : 'Approve'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => rejectResolution(market)}
+                      disabled={pendingLoading === market.id}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Coin Balance Repair Tool</CardTitle>
